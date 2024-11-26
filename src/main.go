@@ -13,8 +13,9 @@ import (
 
 func routes() *mux.Router {
 	r := mux.NewRouter()
-	// r.HandleFunc("/todos", handler).Methods("GET")
+	r.HandleFunc("/todos", handler.GetTodos).Methods("GET")
 	r.HandleFunc("/todos", handler.CreateTodoHandler).Methods("POST")
+	r.HandleFunc("/todos/{id}", handler.UpdateTodoHandler)
 
 	return r
 }

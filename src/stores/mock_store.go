@@ -10,13 +10,19 @@ type MockStore struct {
 	mock.Mock
 }
 
+// UpdateTodo implements Store.
+func (m *MockStore) UpdateTodo(todo *models.Todo, ID int) (*models.Todo, error) {
+	panic("unimplemented")
+}
+
 func (m *MockStore) CreateTodo(todo *models.Todo) (*models.Todo, error) {
 	rets := m.Called(todo)
-	var todoResult *models.Todo
-	if ret := rets.Get(0); ret != nil {
-		todoResult = ret.(*models.Todo)
-	}
-	return todoResult, rets.Error(1)
+	return rets.Get(0).(*models.Todo), rets.Error(1)
+}
+
+func (m *MockStore) GetTodos() ([]*models.Todo, error) {
+	rets := m.Called()
+	return rets.Get(0).([]*models.Todo), rets.Error(1)
 }
 
 func InitMockStore() *MockStore {
