@@ -30,10 +30,6 @@ func CreateTodoHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err != nil {
-		json.NewEncoder(w).Encode(err)
-	}
-
 	newTodo, err := stores.GetStore().CreateTodo(&todo)
 	if err != nil {
 		json.NewEncoder(w).Encode(err)

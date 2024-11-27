@@ -9,6 +9,7 @@ type Store interface {
 	GetTodos() ([]*models.Todo, error)
 	CreateTodo(todo *models.Todo) (*models.Todo, error)
 	UpdateTodo(todo *models.Todo, ID int) (*models.Todo, error)
+	CreateUser(user *models.User) (*models.User, error)
 }
 
 type DbStore struct {
@@ -64,6 +65,18 @@ func (store *DbStore) UpdateTodo(todo *models.Todo, ID int) (*models.Todo, error
 		return nil, err
 	}
 	return updatedTodo, nil
+}
+
+func (store *DbStore) CreateUser(user *models.User) (*models.User, error) {
+	row := store.DB.QueryRow("INSERT INTO users(username, email, password) VALUES ($1, $2, $3) RETURNING username, email", user.UserName, user.Email, user.Password)
+
+	lastInsertedUser := &models.User{}
+
+	err := row.Scan(&lastInsertedUser.UserName, &lastInsertedUser.Email)
+	if err != nil {
+		return nil, err
+	}
+	return lastInsertedUser, nil
 }
 
 func InitStore(s Store) {
