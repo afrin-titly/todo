@@ -9,18 +9,15 @@ import (
 )
 
 // var validateUser *validator.Validate
-
 func init() {
 	validate = validator.New()
 }
-
 func ValidateUser(user *models.User) map[string]string {
 	errors := make(map[string]string)
 	err := validate.Struct(user)
 	if err != nil {
 		for _, err := range err.(validator.ValidationErrors) {
 			var errorMessage string
-
 			switch err.Tag() {
 			case "required":
 				errorMessage = "This field is required"

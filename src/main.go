@@ -13,10 +13,12 @@ import (
 
 func routes() *mux.Router {
 	r := mux.NewRouter()
-	r.HandleFunc("/todos", handler.GetTodos).Methods("GET")
+	r.HandleFunc("/todos", handler.GetTodosHandler).Methods("GET")
 	r.HandleFunc("/todos", handler.CreateTodoHandler).Methods("POST")
-	r.HandleFunc("/todos/{id}", handler.UpdateTodoHandler).Methods("DELETE")
+	r.HandleFunc("/todos/{id:[0-9]+}", handler.UpdateTodoHandler).Methods("PUT")
+	r.HandleFunc("/todos/{id:[0-9]+}", handler.DeleteTodoHandler).Methods("DELETE")
 	r.HandleFunc("/users", handler.CreateUserHandler).Methods("POST")
+	r.HandleFunc("/users/login", handler.LoginUserHandler).Methods("POST")
 
 	return r
 }
