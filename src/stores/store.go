@@ -97,7 +97,7 @@ func (store *DbStore) GetTodo(todoID int, userID int) error {
 		}
 	}()
 
-	todo := *&models.Todo{}
+	todo := &models.Todo{}
 	err = transaction.QueryRow("SELECT t.* from todos t JOIN users_todos ut ON t.id = ut.todo_id WHERE ut.user_id = $1 AND t.id = $2", userID, todoID).Scan(&todo.ID, &todo.TaskName, &todo.Completed, &todo.DueDate, &todo.CreatedAt, &todo.UpdatedAt)
 
 	if err != nil {
