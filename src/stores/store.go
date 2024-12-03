@@ -26,15 +26,6 @@ func GetStore() Store {
 }
 
 func (store *DbStore) CreateTodo(todo *models.Todo, userID int) (*models.Todo, error) {
-
-	// row := store.DB.QueryRow("INSERT INTO todos(task_name, completed, due_date) VALUES ($1, $2, $3) RETURNING task_name, completed, due_date, created_at, updated_at", todo.TaskName, todo.Completed, todo.DueDate)
-
-	// lastInsertedTodo := &models.Todo{}
-
-	// err := row.Scan(&lastInsertedTodo.TaskName, &lastInsertedTodo.Completed, &lastInsertedTodo.DueDate, &lastInsertedTodo.CreatedAt, &lastInsertedTodo.UpdatedAt)
-	// if err != nil {
-	// 	return nil, err
-	// }
 	transaction, err := store.DB.Begin()
 	if err != nil {
 		return nil, err
@@ -45,15 +36,14 @@ func (store *DbStore) CreateTodo(todo *models.Todo, userID int) (*models.Todo, e
 			transaction.Rollback()
 		}
 	}()
-	lastInsertedTodo := &models.Todo{}
 
-	var todoID int
-	err = transaction.QueryRow("INSERT INTO todos(task_name, completed, due_date) VALUES ($1, $2, $3) RETURNING id, task_name, completed, due_date, created_at, updated_at", todo.TaskName, todo.Completed, todo.DueDate).Scan(&todoID, &todo.TaskName, &todo.Completed, &todo.DueDate, &todo.CreatedAt, &todo.UpdatedAt)
+	lastInsertedTodo := &models.Todo{}
+	err = transaction.QueryRow("INSERT INTO todos(task_name, completed, due_date) VALUES ($1, $2, $3) RETURNING id, task_name, completed, due_date, created_at, updated_at", todo.TaskName, todo.Completed, todo.DueDate).Scan(&lastInsertedTodo.ID, &lastInsertedTodo.TaskName, &lastInsertedTodo.Completed, &lastInsertedTodo.DueDate, &lastInsertedTodo.CreatedAt, &lastInsertedTodo.UpdatedAt)
 
 	if err != nil {
 		return nil, err
 	}
-	_, err = transaction.Exec("INSERT INTO user_todo (user_id, todo_id) VALUES ($1, $2)", userID, todoID)
+	_, err = transaction.Exec("INSERT INTO users_todos (user_id, todo_id) VALUES ($1, $2)", userID, lastInsertedTodo.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +97,8 @@ func (store *DbStore) GetTodo(todoID int, userID int) error {
 		}
 	}()
 
-	err = transaction.QueryRow("SELECT t.* from todos t JOIN users_todos ut ON t.id = ut.todo_id WHERE ut.user_id = $1 AND t.id = $2", userID, todoID).Scan()
+	todo := *&models.Todo{}
+	err = transaction.QueryRow("SELECT t.* from todos t JOIN users_todos ut ON t.id = ut.todo_id WHERE ut.user_id = $1 AND t.id = $2", userID, todoID).Scan(&todo.ID, &todo.TaskName, &todo.Completed, &todo.DueDate, &todo.CreatedAt, &todo.UpdatedAt)
 
 	if err != nil {
 		return err
@@ -116,11 +107,8 @@ func (store *DbStore) GetTodo(todoID int, userID int) error {
 }
 
 func (store *DbStore) UpdateTodo(todo *models.Todo, todoID int) (*models.Todo, error) {
-	row := store.DB.QueryRow("UPDATE todos SET task_name=$1, completed=$2, due_date=$3 WHERE id=$4 RETURNING task_name, completed, due_date, created_at, updated_at", todo.TaskName, todo.Completed, todo.DueDate, todoID)
-
 	updatedTodo := &models.Todo{}
-	err := row.Scan(&updatedTodo.TaskName, &updatedTodo.Completed, &updatedTodo.DueDate, &updatedTodo.CreatedAt, &updatedTodo.UpdatedAt)
-
+	err := store.DB.QueryRow("UPDATE todos SET task_name=$1, completed=$2, due_date=$3 WHERE id=$4 RETURNING id, task_name, completed, due_date, created_at, updated_at", todo.TaskName, todo.Completed, todo.DueDate, todoID).Scan(&updatedTodo.ID, &updatedTodo.TaskName, &updatedTodo.Completed, &updatedTodo.DueDate, &updatedTodo.CreatedAt, &updatedTodo.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
