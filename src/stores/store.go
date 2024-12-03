@@ -6,9 +6,10 @@ import (
 )
 
 type Store interface {
-	GetTodos() ([]*models.Todo, error)
+	GetTodos(userID int) ([]*models.Todo, error)
 	CreateTodo(todo *models.Todo, userID int) (*models.Todo, error)
-	UpdateTodo(todo *models.Todo, ID int) (*models.Todo, error)
+	UpdateTodo(todo *models.Todo, todoID int) (*models.Todo, error)
+	GetTodo(todoID int, userID int) error
 	DeleteTodo(ID int) error
 	CreateUser(user *models.User) (*models.User, error)
 	GetUser(user *models.User) (*models.User, error)
@@ -65,8 +66,18 @@ func (store *DbStore) CreateTodo(todo *models.Todo, userID int) (*models.Todo, e
 	return lastInsertedTodo, nil
 }
 
-func (store *DbStore) GetTodos() ([]*models.Todo, error) {
-	rows, err := store.DB.Query("Select task_name, completed, due_date FROM todos")
+func (store *DbStore) GetTodos(userID int) ([]*models.Todo, error) {
+	transaction, err := store.DB.Begin()
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		if err != nil {
+			transaction.Rollback()
+		}
+	}()
+	rows, err := transaction.Query("SELECT t.* from todos t JOIN users_todos ut ON t.id = ut.todo_id WHERE ut.user_id = $1", userID)
 
 	if err != nil {
 		return nil, err
@@ -85,8 +96,27 @@ func (store *DbStore) GetTodos() ([]*models.Todo, error) {
 	return todos, nil
 }
 
-func (store *DbStore) UpdateTodo(todo *models.Todo, ID int) (*models.Todo, error) {
-	row := store.DB.QueryRow("UPDATE todos SET task_name=$1, completed=$2, due_date=$3 WHERE id=$4 RETURNING task_name, completed, due_date, created_at, updated_at", todo.TaskName, todo.Completed, todo.DueDate, ID)
+func (store *DbStore) GetTodo(todoID int, userID int) error {
+	transaction, err := store.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			transaction.Rollback()
+		}
+	}()
+
+	err = transaction.QueryRow("SELECT t.* from todos t JOIN users_todos ut ON t.id = ut.todo_id WHERE ut.user_id = $1 AND t.id = $2", userID, todoID).Scan()
+
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (store *DbStore) UpdateTodo(todo *models.Todo, todoID int) (*models.Todo, error) {
+	row := store.DB.QueryRow("UPDATE todos SET task_name=$1, completed=$2, due_date=$3 WHERE id=$4 RETURNING task_name, completed, due_date, created_at, updated_at", todo.TaskName, todo.Completed, todo.DueDate, todoID)
 
 	updatedTodo := &models.Todo{}
 	err := row.Scan(&updatedTodo.TaskName, &updatedTodo.Completed, &updatedTodo.DueDate, &updatedTodo.CreatedAt, &updatedTodo.UpdatedAt)
@@ -118,7 +148,7 @@ func (store *DbStore) CreateUser(user *models.User) (*models.User, error) {
 func (store *DbStore) GetUser(user *models.User) (*models.User, error) {
 	row := store.DB.QueryRow("SELECT id, username, email, password FROM users WHERE email=$1 AND password=$2", user.Email, user.Password)
 	userData := &models.User{}
-	err := row.Scan(&user.ID, &userData.UserName, &userData.Email, &userData.Password)
+	err := row.Scan(&userData.ID, &userData.UserName, &userData.Email, &userData.Password)
 	if err != nil {
 		return nil, err
 	}
