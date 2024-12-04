@@ -48,6 +48,7 @@ func TestCreateTodo(t *testing.T) {
 				mock.ExpectQuery("INSERT INTO todos").WithArgs(todoInput.TaskName, todoInput.Completed, todoInput.DueDate).WillReturnRows(sqlmock.NewRows([]string{"id", "task_name", "completed", "due_date", "created_at", "updated_at"}).AddRow(1, todoInput.TaskName, todoInput.Completed, todoInput.DueDate, todoInput.DueDate, todoInput.DueDate))
 
 				mock.ExpectExec("INSERT INTO users_todos").WithArgs(userID, 1).WillReturnResult(sqlmock.NewResult(1, 1))
+				mock.ExpectCommit()
 			},
 			shouldError: false,
 		},
@@ -58,17 +59,11 @@ func TestCreateTodo(t *testing.T) {
 				Completed: false,
 				DueDate:   time.Date(2024, 11, 30, 23, 59, 59, 0, time.UTC).UTC(),
 			},
-			expectedTodo: &models.Todo{
-				ID:        1,
-				TaskName:  "test task",
-				Completed: false,
-				DueDate:   time.Date(2024, 11, 30, 23, 59, 59, 0, time.UTC).UTC(),
-				CreatedAt: time.Date(2024, 11, 30, 23, 59, 59, 0, time.UTC).UTC(),
-				UpdatedAt: time.Date(2024, 11, 30, 23, 59, 59, 0, time.UTC).UTC(),
-			},
-			userID: 1,
+			expectedTodo: nil,
+			userID:       1,
 			mockSetup: func(todoInput *models.Todo, userID int) {
 				mock.ExpectQuery("INSERT INTO todos").WithArgs(todoInput.TaskName, todoInput.Completed, todoInput.DueDate).WillReturnError(fmt.Errorf("error inserting into todos"))
+				mock.ExpectRollback()
 			},
 			shouldError: true,
 		},
@@ -79,19 +74,14 @@ func TestCreateTodo(t *testing.T) {
 				Completed: false,
 				DueDate:   time.Date(2024, 11, 30, 23, 59, 59, 0, time.UTC).UTC(),
 			},
-			expectedTodo: &models.Todo{
-				ID:        1,
-				TaskName:  "test task",
-				Completed: false,
-				DueDate:   time.Date(2024, 11, 30, 23, 59, 59, 0, time.UTC).UTC(),
-				CreatedAt: time.Date(2024, 11, 30, 23, 59, 59, 0, time.UTC).UTC(),
-				UpdatedAt: time.Date(2024, 11, 30, 23, 59, 59, 0, time.UTC).UTC(),
-			},
-			userID: 1,
+			expectedTodo: nil,
+			userID:       1,
 			mockSetup: func(todoInput *models.Todo, userID int) {
 				mock.ExpectQuery("INSERT INTO todos").WithArgs(todoInput.TaskName, todoInput.Completed, todoInput.DueDate).WillReturnRows(sqlmock.NewRows([]string{"id", "task_name", "completed", "due_date", "created_at", "updated_at"}).AddRow(1, todoInput.TaskName, todoInput.Completed, todoInput.DueDate, todoInput.DueDate, todoInput.DueDate))
 
 				mock.ExpectExec("INSERT INTO users_todos").WithArgs(userID, 1).WillReturnError(fmt.Errorf("some db error"))
+				mock.ExpectRollback()
+
 			},
 			shouldError: true,
 		},
@@ -101,7 +91,6 @@ func TestCreateTodo(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mock.ExpectBegin()
 			tc.mockSetup(tc.todoInput, tc.userID)
-			mock.ExpectCommit()
 			newTodo, err := store.CreateTodo(tc.todoInput, tc.userID)
 			if tc.shouldError {
 				assert.Error(t, err)
@@ -109,7 +98,8 @@ func TestCreateTodo(t *testing.T) {
 				assert.NoError(t, err)
 				assert.Equal(t, tc.expectedTodo, newTodo)
 			}
-
+			err = mock.ExpectationsWereMet()
+			assert.NoError(t, err)
 		})
 	}
 }
