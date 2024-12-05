@@ -65,6 +65,8 @@ func (store *DbStore) GetTodos(userID int) ([]*models.Todo, error) {
 	defer func() {
 		if err != nil {
 			transaction.Rollback()
+		} else {
+			transaction.Commit()
 		}
 	}()
 	rows, err := transaction.Query("SELECT t.* from todos t JOIN users_todos ut ON t.id = ut.todo_id WHERE ut.user_id = $1", userID)

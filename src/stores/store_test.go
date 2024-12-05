@@ -180,3 +180,66 @@ func TestUpdateTodo(t *testing.T) {
 		assert.NoError(t, err)
 	}
 }
+
+func TestGetTodos(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer db.Close()
+	store := &DbStore{DB: db}
+
+	type testCase struct {
+		name          string
+		userID        int
+		expectedTodos []*models.Todo
+		mockSetup     func(userID int, expectedTodos []*models.Todo)
+		shouldError   bool
+	}
+
+	tests := []testCase{
+		{
+			name:   "Successful Get todos",
+			userID: 1,
+			expectedTodos: []*models.Todo{
+				{TaskName: "test task 1", Completed: false, DueDate: time.Date(2024, 11, 30, 23, 59, 59, 0, time.UTC).UTC()},
+				{TaskName: "test task 2", Completed: true, DueDate: time.Date(2024, 11, 30, 23, 59, 59, 0, time.UTC).UTC()},
+				{TaskName: "test task 3", Completed: false, DueDate: time.Date(2024, 11, 30, 23, 59, 59, 0, time.UTC).UTC()},
+			},
+			mockSetup: func(userID int, expectedTodos []*models.Todo) {
+				rows := sqlmock.NewRows([]string{"task_name", "completed", "due_date"})
+				for _, todo := range expectedTodos {
+					rows.AddRow(todo.TaskName, todo.Completed, todo.DueDate)
+				}
+				mock.ExpectQuery("SELECT t.* from todos t JOIN users_todos ut ON t.id = ut.todo_id WHERE ut.user_id = \\$1").WithArgs(userID).WillReturnRows(rows)
+				mock.ExpectCommit()
+			},
+			shouldError: false,
+		},
+		{
+			name:          "Unsuccessful Get todos",
+			userID:        1,
+			expectedTodos: nil,
+			mockSetup: func(userID int, expectedTodos []*models.Todo) {
+				mock.ExpectQuery("SELECT t.* from todos t JOIN users_todos ut ON t.id = ut.todo_id WHERE ut.user_id = \\$1").WithArgs(userID).WillReturnError(fmt.Errorf("some db error"))
+				mock.ExpectRollback()
+			},
+			shouldError: true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mock.ExpectBegin()
+			tc.mockSetup(tc.userID, tc.expectedTodos)
+			todos, err := store.GetTodos(tc.userID)
+			if tc.shouldError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, len(tc.expectedTodos), len(todos))
+			}
+		})
+		err = mock.ExpectationsWereMet()
+		assert.NoError(t, err)
+	}
+}
