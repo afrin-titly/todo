@@ -5,6 +5,7 @@ import (
 )
 
 type Todo struct {
+	ID        int       `json:"id,omitempty"`
 	TaskName  string    `json:"task_name" validate:"required,min=5"`
 	Completed bool      `json:"completed"`
 	DueDate   time.Time `json:"due_date"`
