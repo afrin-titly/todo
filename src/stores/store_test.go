@@ -243,3 +243,66 @@ func TestGetTodos(t *testing.T) {
 		assert.NoError(t, err)
 	}
 }
+
+func TestCreateUser(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+
+	defer db.Close()
+	store := &DbStore{DB: db}
+	type testCase struct {
+		name         string
+		inputUser    *models.User
+		expectedUser *models.User
+		mockSetup    func(inputUser *models.User, expectedUser *models.User)
+		shouldError  bool
+	}
+	tests := []testCase{
+		{
+			name: "Successful user create",
+			inputUser: &models.User{
+				UserName: "test user",
+				Password: "secret",
+				Email:    "test@email.com",
+			},
+			expectedUser: &models.User{
+				UserName: "test user",
+				Email:    "test@email.com",
+			},
+			mockSetup: func(inputUser *models.User, expectedUser *models.User) {
+				mock.ExpectQuery("INSERT INTO users").WithArgs(inputUser.UserName, inputUser.Email, inputUser.Password).WillReturnRows(sqlmock.NewRows([]string{"username", "email"}).AddRow(expectedUser.UserName, expectedUser.Email))
+			},
+			shouldError: false,
+		},
+		{
+			name: "Unsuccessful user create",
+			inputUser: &models.User{
+				UserName: "test user",
+				Password: "secret",
+				Email:    "test@email.com",
+			},
+			expectedUser: nil,
+			mockSetup: func(inputUser *models.User, expectedUser *models.User) {
+				mock.ExpectQuery("INSERT INTO users").WithArgs(inputUser.UserName, inputUser.Email, inputUser.Password).WillReturnError(fmt.Errorf("some DB error"))
+			},
+			shouldError: true,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.mockSetup(tc.inputUser, tc.expectedUser)
+			resultUser, err := store.CreateUser(tc.inputUser)
+			if tc.shouldError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tc.expectedUser, resultUser)
+			}
+
+			err = mock.ExpectationsWereMet()
+			assert.NoError(t, err)
+		})
+	}
+}
